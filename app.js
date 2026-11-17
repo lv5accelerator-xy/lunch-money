@@ -24,7 +24,7 @@
 
   // 金额统一用“分”（整数）保存，避免浮点误差
   const toCents = (str) => Math.round(parseFloat(str) * 100);
-  const fmt = (cents) => (cents < 0 ? '-' : '') + '¥' + (Math.abs(cents) / 100).toFixed(2);
+  const fmt = (cents) => (cents < 0 ? '-' : '') + '$' + (Math.abs(cents) / 100).toFixed(2);
   const today = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

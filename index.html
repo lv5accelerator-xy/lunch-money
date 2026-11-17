@@ -42,8 +42,8 @@
     <!-- 记账 -->
     <section id="ledger" class="panel">
       <div class="balance card">
-        <span class="label">当前余额</span>
-        <span id="balance" class="amount">¥0.00</span>
+        <span class="label">当前余额（CAD）</span>
+        <span id="balance" class="amount">$0.00</span>
         <span id="balanceSub" class="sub"></span>
       </div>
 
@@ -55,7 +55,7 @@
               <label><input type="radio" name="type" value="expense" checked> 消费（扣除）</label>
               <label><input type="radio" name="type" value="deposit"> 存入（充值）</label>
             </div>
-            <label>金额
+            <label>金额（加元 CAD）
               <input id="txAmount" type="number" step="0.01" min="0.01" inputmode="decimal" placeholder="0.00" required>
             </label>
             <label>日期
