@@ -1,0 +1,607 @@
+<title>午饭小助手</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* 布局：顶部标签切换两个工具；转盘页左转盘右列表，记账页上余额下两栏，窄屏全部单列 */
+:root {
+  --bg: #f4f3ef;
+  --surface: #ffffff;
+  --surface-2: #efede7;
+  --line: #e4e0d8;
+  --fg: #26231f;
+  --muted: #7d776f;
+  --accent: #e0590f;
+  --accent-strong: #c24a0a;
+  --on-accent: #ffffff;
+  --good: #2b8a3e;
+  --bad: #d6336c;
+  --shadow: 0 1px 3px rgba(40, 30, 20, .07);
+  --font-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif;
+  --font-num: ui-rounded, "SF Pro Rounded", -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #181715; --surface: #23211e; --surface-2: #2d2a26; --line: #38342f;
+    --fg: #eeebe6; --muted: #a39d94; --accent: #f07a35; --accent-strong: #ff8f4d; --on-accent: #1a1100;
+    --good: #69db7c; --bad: #ff8fab; --shadow: none; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #181715; --surface: #23211e; --surface-2: #2d2a26; --line: #38342f;
+  --fg: #eeebe6; --muted: #a39d94; --accent: #f07a35; --accent-strong: #ff8f4d; --on-accent: #1a1100;
+  --good: #69db7c; --bad: #ff8fab; --shadow: none; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.wrap { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+h1 { margin: 0; font-size: 24px; letter-spacing: .02em; text-wrap: balance; }
+h2 { margin: 0; font-size: 17px; }
+.tabs { display: inline-flex; background: var(--surface-2); border-radius: 999px; padding: 4px; }
+.tab { border: 0; background: transparent; color: var(--muted); padding: 7px 16px; border-radius: 999px; font: inherit; cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--surface); color: var(--fg); box-shadow: var(--shadow); font-weight: 600; }
+
+.status { font-size: 13px; color: var(--muted); padding: 8px 12px; border-radius: 10px; background: var(--surface-2); }
+.status.warn { color: var(--bad); }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); min-width: 0; }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+
+button { font: inherit; cursor: pointer; color: inherit; }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn { background: var(--accent); color: var(--on-accent); border: 0; border-radius: 10px; padding: 9px 16px; font-weight: 600; }
+.btn:hover { background: var(--accent-strong); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.big { font-size: 18px; padding: 12px 40px; }
+.ghost { background: var(--surface-2); border: 0; border-radius: 8px; padding: 6px 11px; font-size: 13px; }
+.ghost:hover { background: var(--line); }
+.link { background: none; border: 0; padding: 0; color: var(--muted); font-size: 13px; }
+.link:hover { color: var(--bad); }
+.link.armed, .del.armed { color: var(--bad); font-weight: 600; }
+
+input[type="text"], input[type="number"], input[type="date"], textarea {
+  width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; font: inherit;
+  background: var(--bg); color: var(--fg);
+}
+input:focus, textarea:focus { border-color: var(--accent); outline: none; }
+.row { display: flex; gap: 8px; }
+.row > input { flex: 1; min-width: 0; }
+.hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+
+.panel[hidden] { display: none; }
+
+/* 转盘 */
+.wheel-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.wheel-box { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-top: 6px; }
+.wheel-stage { position: relative; width: 100%; max-width: 440px; }
+#wheelCanvas { display: block; width: 100%; max-width: 100%; height: auto; aspect-ratio: 1; }
+.pointer {
+  position: absolute; top: -6px; left: 50%; transform: translateX(-50%); z-index: 2;
+  width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent;
+  border-top: 28px solid var(--fg);
+}
+.result { font-size: 21px; font-weight: 700; min-height: 1.6em; text-align: center; margin: 0; }
+.result strong { color: var(--accent); }
+.today-pick { font-size: 13px; color: var(--muted); text-align: center; margin: 0; }
+.today-pick b { color: var(--fg); }
+
+.list { list-style: none; margin: 10px 0 0; padding: 0; max-height: 380px; overflow-y: auto; }
+.list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--line); min-width: 0; }
+.list li:last-child { border-bottom: 0; }
+.name { min-width: 0; overflow-wrap: anywhere; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+.del { background: none; border: 0; color: var(--muted); font-size: 13px; padding: 2px 6px; border-radius: 6px; flex-shrink: 0; }
+.del:hover { color: var(--bad); }
+.empty { color: var(--muted); font-size: 13px; padding: 14px 4px; }
+
+/* 记账 */
+.balance { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 22px 18px; }
+.balance .label { color: var(--muted); font-size: 13px; letter-spacing: .08em; }
+.balance .amount { font-family: var(--font-num); font-size: 44px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.balance .amount.neg { color: var(--bad); }
+.pill { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.pill.warn { color: var(--bad); }
+.stats { display: flex; gap: 8px 18px; flex-wrap: wrap; justify-content: center; font-size: 13px; color: var(--muted); margin-top: 8px; }
+.stats b { color: var(--fg); font-variant-numeric: tabular-nums; }
+
+.ledger-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); gap: 18px; align-items: start; }
+.tx-form { display: flex; flex-direction: column; gap: 12px; }
+.tx-form label.field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface-2); border-radius: 10px; padding: 3px; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { text-align: center; padding: 7px 4px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--muted); }
+.seg input:checked + span { color: var(--fg); font-weight: 600; }
+.seg label:has(input:checked) { background: var(--surface); box-shadow: var(--shadow); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.quick { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.tx-list { max-height: 520px; }
+.tx-list li.day { background: var(--surface-2); border-radius: 6px; padding: 4px 8px; font-size: 12px; color: var(--muted); border-bottom: 0; margin-top: 6px; }
+.tx-main { min-width: 0; display: flex; flex-direction: column; }
+.tx-note { overflow-wrap: anywhere; }
+.tx-by { font-size: 12px; color: var(--muted); }
+.tx-right { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.amt { font-variant-numeric: tabular-nums; font-weight: 600; }
+.amt.expense { color: var(--bad); }
+.amt.deposit { color: var(--good); }
+
+details.backup { margin-top: 14px; font-size: 13px; color: var(--muted); }
+details.backup summary { cursor: pointer; }
+.backup-body { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.backup-body textarea { min-height: 90px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.confirm-box { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px; border-radius: 10px; background: var(--surface-2); color: var(--fg); }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 10px; font-size: 14px; z-index: 20;
+  max-width: calc(100% - 32px);
+}
+
+@media (max-width: 720px) {
+  .wheel-layout, .ledger-layout { grid-template-columns: minmax(0, 1fr); }
+  .balance .amount { font-size: 36px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>午饭小助手</h1>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-wheel" data-tab="wheel" aria-selected="true">今天吃什么</button>
+      <button class="tab" role="tab" id="tab-ledger" data-tab="ledger" aria-selected="false">饭钱记账</button>
+    </div>
+  </header>
+
+  <div id="status" class="status">正在连接共享数据……</div>
+
+  <!-- 抽奖转盘 -->
+  <section id="wheel" class="panel" role="tabpanel">
+    <div class="wheel-layout">
+      <div class="card wheel-box">
+        <div class="wheel-stage">
+          <div class="pointer" aria-hidden="true"></div>
+          <canvas id="wheelCanvas" width="640" height="640" aria-label="饭店转盘"></canvas>
+        </div>
+        <button id="spinBtn" class="btn big" disabled>开始抽奖</button>
+        <p id="result" class="result" aria-live="polite"></p>
+        <p id="todayPick" class="today-pick"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>饭店列表 <span id="rCount" class="pill"></span></h2>
+        </div>
+        <form id="restaurantForm" class="row">
+          <input id="restaurantInput" type="text" placeholder="输入饭店名字" maxlength="30" autocomplete="off">
+          <button type="submit" class="btn" id="addBtn">添加</button>
+        </form>
+        <p class="hint">一次可以加多个，用逗号、顿号或换行隔开。大家看到的是同一份列表。</p>
+        <ul id="restaurantList" class="list"></ul>
+        <button id="clearRestaurants" class="link" hidden>清空列表</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 记账 -->
+  <section id="ledger" class="panel" role="tabpanel" hidden>
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div class="card balance">
+        <span class="label">饭钱余额（CAD）</span>
+        <span id="balance" class="amount">$0.00</span>
+        <span id="balanceSub" class="pill">还没有记录</span>
+        <div id="stats" class="stats"></div>
+      </div>
+
+      <div class="ledger-layout">
+        <div class="card">
+          <h2 style="margin-bottom:12px">记一笔</h2>
+          <form id="txForm" class="tx-form">
+            <div class="seg" role="radiogroup" aria-label="类型">
+              <label><input type="radio" name="txType" id="typeExpense" value="expense" checked><span>消费（扣除）</span></label>
+              <label><input type="radio" name="txType" id="typeDeposit" value="deposit"><span>存入（充值）</span></label>
+            </div>
+            <label class="field">金额（加元 CAD）
+              <input id="txAmount" type="number" step="0.01" min="0.01" inputmode="decimal" placeholder="例如 18.50" required>
+            </label>
+            <label class="field">日期
+              <input id="txDate" type="date" required>
+            </label>
+            <label class="field">备注
+              <input id="txNote" type="text" list="restaurantOptions" maxlength="50" placeholder="饭店名，或谁存的钱">
+              <datalist id="restaurantOptions"></datalist>
+            </label>
+            <div id="quickNotes" class="quick"></div>
+            <button type="submit" class="btn" id="saveTx">保存</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>流水记录</h2>
+          </div>
+          <ul id="txList" class="list tx-list"></ul>
+          <p id="txEmpty" class="empty">还没有记录。先记一笔「存入」，再记每天的消费。</p>
+
+          <details class="backup">
+            <summary>备份与导入</summary>
+            <div class="backup-body">
+              <div class="row">
+                <button type="button" id="copyBackup" class="ghost">复制全部数据（JSON）</button>
+                <label class="ghost" style="cursor:pointer">导入备份文件<input id="importInput" type="file" accept="application/json,.json" hidden></label>
+              </div>
+              <textarea id="backupText" readonly hidden aria-label="备份数据"></textarea>
+              <div id="importConfirm" class="confirm-box" hidden></div>
+              <p class="hint" style="margin:0">导入会把文件里的饭店和流水追加到共享数据，不会删除现有记录。可以导入旧版本地网页导出的备份。</p>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- 工具 ----------
+  const toCents = (s) => Math.round(parseFloat(s) * 100);
+  const fmt = (c) => (c < 0 ? '-' : '') + '$' + (Math.abs(c) / 100).toFixed(2);
+  const pad = (n) => String(n).padStart(2, '0');
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  let toastTimer;
+  function toast(msg) {
+    const t = $('toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
+  }
+  function setStatus(msg, warn) {
+    const s = $('status'); s.hidden = !msg; s.textContent = msg || ''; s.classList.toggle('warn', !!warn);
+  }
+
+  // 两次点击确认（页面里不能用 confirm 弹窗）
+  function armOrRun(btn, label, run) {
+    if (btn.classList.contains('armed')) { btn.classList.remove('armed'); run(); return; }
+    const orig = btn.textContent;
+    btn.classList.add('armed'); btn.textContent = label;
+    setTimeout(() => { if (btn.isConnected) { btn.classList.remove('armed'); btn.textContent = orig; } }, 3000);
+  }
+
+  // ---------- 状态 ----------
+  let db = null, user = null, myId = null, canWrite = true;
+  let restaurants = [], txs = [], pick = null;
+  const loaded = { r: false, t: false };
+  let spinning = false;
+
+  function setWritable(ok) {
+    canWrite = ok;
+    ['addBtn', 'saveTx', 'restaurantInput', 'txAmount', 'txNote', 'txDate'].forEach((id) => { $(id).disabled = !ok; });
+    renderRestaurants(); renderLedger();
+  }
+
+  async function write(fn) {
+    if (!db) { toast('还没连上共享数据'); return false; }
+    try { await fn(); return true; }
+    catch (e) {
+      const code = e && e.code;
+      if (code === 'invalid_argument') { setWritable(false); setStatus('你只有查看权限，不能修改数据。需要记账请找分享者把你设为可编辑。', true); }
+      else if (code === 'quota_exceeded') toast('存储已满：' + (e.message || '请删除一些旧记录'));
+      else if (code === 'resource_exhausted') toast('操作太快了，稍等一下再试');
+      else if (code === 'unavailable') toast('网络不稳定，没保存成功，请再试一次');
+      else toast('保存失败：' + (e && e.message || code || '未知错误'));
+      return false;
+    }
+  }
+
+  // ---------- 标签 ----------
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === name)));
+    $('wheel').hidden = name !== 'wheel';
+    $('ledger').hidden = name !== 'ledger';
+    if (name === 'wheel') drawWheel();
+  }
+  document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+
+  // ---------- 转盘 ----------
+  const COLORS = ['#ff8787', '#ffa94d', '#ffd43b', '#a9e34b', '#69db7c', '#38d9a9', '#3bc9db', '#4dabf7', '#91a7ff', '#b197fc', '#e599f7', '#faa2c1'];
+  const colorFor = (i, n) => (n > 1 && i === n - 1 && i % COLORS.length === 0) ? COLORS[5] : COLORS[i % COLORS.length];
+  const canvas = $('wheelCanvas'), ctx = canvas.getContext('2d');
+  const TAU = Math.PI * 2, POINTER = -Math.PI / 2;
+  let rotation = 0;
+  let wheelItems = []; // 转动期间锁定的列表快照
+
+  function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  function drawWheel() {
+    const list = spinning ? wheelItems : restaurants;
+    const size = canvas.width, cx = size / 2, cy = size / 2, r = size / 2 - 10;
+    ctx.clearRect(0, 0, size, size);
+    if (!list.length) {
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fillStyle = cssVar('--surface-2'); ctx.fill();
+      ctx.fillStyle = cssVar('--muted'); ctx.font = '28px ' + cssVar('--font-body');
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(loaded.r ? '先在列表里添加饭店' : '加载中……', cx, cy);
+      return;
+    }
+    const n = list.length, seg = TAU / n;
+    for (let i = 0; i < n; i++) {
+      const start = rotation + i * seg;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, start, start + seg); ctx.closePath();
+      ctx.fillStyle = colorFor(i, n); ctx.fill();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke();
+
+      const mid = start + seg / 2, flip = Math.cos(mid) < 0;
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(flip ? mid + Math.PI : mid);
+      ctx.textAlign = flip ? 'left' : 'right'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#26231f';
+      const fs = Math.max(16, Math.min(32, 320 / n + 10));
+      ctx.font = `600 ${fs}px ${cssVar('--font-body')}`;
+      const full = list[i].name; let name = full;
+      while (ctx.measureText(name).width > r - 70 && name.length > 1) name = name.slice(0, -1);
+      if (name !== full) name = name.slice(0, -1) + '…';
+      ctx.fillText(name, flip ? -(r - 22) : r - 22, 0);
+      ctx.restore();
+    }
+    ctx.beginPath(); ctx.arc(cx, cy, 34, 0, TAU); ctx.fillStyle = '#ffffff'; ctx.fill();
+    ctx.lineWidth = 4; ctx.strokeStyle = '#26231f'; ctx.stroke();
+  }
+
+  function renderRestaurants() {
+    const n = restaurants.length;
+    $('rCount').textContent = loaded.r ? `${n} 家` : '';
+    $('restaurantList').innerHTML = !loaded.r ? '<li class="empty">加载中……</li>' : !n
+      ? '<li class="empty">列表是空的。在上面输入饭店名字，至少加 2 家就能抽奖。</li>'
+      : restaurants.map((r, i) => `
+        <li><span class="name"><span class="dot" style="background:${colorFor(i, n)}"></span>${esc(r.name)}</span>
+        ${canWrite ? `<button class="del" data-id="${esc(r.id)}" aria-label="删除 ${esc(r.name)}">删除</button>` : ''}</li>`).join('');
+    $('restaurantOptions').innerHTML = restaurants.map((r) => `<option value="${esc(r.name)}"></option>`).join('');
+    $('quickNotes').innerHTML = restaurants.slice(0, 8).map((r) => `<button type="button" class="ghost" data-note="${esc(r.name)}">${esc(r.name)}</button>`).join('');
+    $('spinBtn').disabled = spinning || n < 2;
+    $('clearRestaurants').hidden = !(canWrite && n);
+    if (!spinning) drawWheel();
+  }
+
+  $('restaurantForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = $('restaurantInput');
+    const names = input.value.split(/[,，、;；\n]+/).map((s) => s.trim().slice(0, 30)).filter(Boolean);
+    const existing = new Set(restaurants.map((r) => r.name));
+    const fresh = [...new Set(names)].filter((nm) => !existing.has(nm));
+    input.value = '';
+    if (!fresh.length) { if (names.length) toast('这些饭店已经在列表里了'); return; }
+    for (const name of fresh) {
+      const ok = await write(() => db.collection('restaurants').add({ name, createdAt: Date.now(), by: myId }));
+      if (!ok) break;
+    }
+  });
+  $('restaurantInput').addEventListener('paste', (e) => {
+    const text = e.clipboardData && e.clipboardData.getData('text');
+    if (text && /\n/.test(text)) { e.preventDefault(); e.target.value = text.replace(/\r?\n/g, '，'); }
+  });
+  $('restaurantList').addEventListener('click', (e) => {
+    const btn = e.target.closest('.del');
+    if (!btn || spinning) return;
+    armOrRun(btn, '确认删除', () => write(() => db.doc('restaurants/' + btn.dataset.id).delete()));
+  });
+  $('clearRestaurants').addEventListener('click', (e) => {
+    if (spinning) return;
+    armOrRun(e.currentTarget, '再点一次清空全部饭店', async () => {
+      for (const r of restaurants.slice()) { if (!(await write(() => db.doc('restaurants/' + r.id).delete()))) break; }
+    });
+  });
+
+  const easeOut = (t) => 1 - Math.pow(1 - t, 4);
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  $('spinBtn').addEventListener('click', () => {
+    if (spinning || restaurants.length < 2) return;
+    spinning = true; wheelItems = restaurants.slice();
+    $('spinBtn').disabled = true; $('result').textContent = '转啊转……';
+    const n = wheelItems.length, seg = TAU / n;
+    const target = Math.floor(Math.random() * n);
+    const jitter = (Math.random() * 0.7 + 0.15) * seg;
+    const startRot = rotation;
+    let endRot = POINTER - target * seg - jitter;
+    while (endRot < startRot + TAU * 6) endRot += TAU;
+    const duration = reduceMotion ? 600 : 4200, t0 = performance.now();
+
+    function frame(now) {
+      const t = Math.min(1, (now - t0) / duration);
+      rotation = startRot + (endRot - startRot) * easeOut(t);
+      drawWheel();
+      if (t < 1) { requestAnimationFrame(frame); return; }
+      rotation %= TAU; spinning = false;
+      const picked = wheelItems[target].name;
+      $('result').innerHTML = `今天吃：<strong>${esc(picked)}</strong>`;
+      renderRestaurants();
+      if (canWrite && db) write(() => db.doc('picks/' + today()).set({ name: picked, by: myId, at: Date.now() }));
+    }
+    requestAnimationFrame(frame);
+  });
+
+  async function renderPick() {
+    const el = $('todayPick');
+    if (!pick) { el.innerHTML = loaded.r ? '今天还没人抽过' : ''; return; }
+    let who = '';
+    if (pick.by && user) { const ps = await user.profiles([pick.by]); who = ps[pick.by] && ps[pick.by].name; }
+    const time = new Date(pick.at); const hm = `${pad(time.getHours())}:${pad(time.getMinutes())}`;
+    el.innerHTML = `今日已抽中 <b>${esc(pick.name)}</b>（${esc(who || '有人')} ${hm} 抽的）
+      ${canWrite ? ` · <button type="button" class="link" id="recordPick" style="color:var(--accent)">记这顿饭的消费</button>` : ''}`;
+    const b = $('recordPick');
+    if (b) b.addEventListener('click', () => {
+      switchTab('ledger'); $('typeExpense').checked = true; $('txNote').value = pick.name; $('txDate').value = today(); $('txAmount').focus();
+    });
+  }
+
+  // ---------- 记账 ----------
+  let renderSeq = 0;
+  async function renderLedger() {
+    const seq = ++renderSeq;
+    const list = txs.slice().sort((a, b) => b.date.localeCompare(a.date) || (b.created || 0) - (a.created || 0));
+    const bal = list.reduce((s, t) => s + (t.type === 'deposit' ? t.amount : -t.amount), 0);
+    $('balance').textContent = fmt(bal);
+    $('balance').classList.toggle('neg', bal < 0);
+
+    const exp = list.filter((t) => t.type === 'expense');
+    const spent = exp.reduce((s, t) => s + t.amount, 0);
+    const days = new Set(exp.map((t) => t.date)).size;
+    const avg = days ? spent / days : 0;
+    const sub = $('balanceSub');
+    sub.classList.toggle('warn', bal < 0 || (avg > 0 && bal < avg * 3));
+    if (!loaded.t) sub.textContent = '加载中……';
+    else if (!list.length) sub.textContent = '还没有记录';
+    else if (bal < 0) sub.textContent = `已透支 ${fmt(-bal)}，该补钱了`;
+    else if (avg > 0) sub.textContent = `日均 ${fmt(Math.round(avg))}，大约还够 ${Math.floor(bal / avg)} 天`;
+    else sub.textContent = '还没有消费记录';
+
+    const deposited = list.filter((t) => t.type === 'deposit').reduce((s, t) => s + t.amount, 0);
+    const month = today().slice(0, 7);
+    const monthSpent = exp.filter((t) => t.date.startsWith(month)).reduce((s, t) => s + t.amount, 0);
+    $('stats').innerHTML = list.length ? `<span>累计存入 <b>${fmt(deposited)}</b></span><span>累计消费 <b>${fmt(spent)}</b></span><span>本月消费 <b>${fmt(monthSpent)}</b></span>` : '';
+
+    const ids = [...new Set(list.map((t) => t.by).filter(Boolean))];
+    const ps = user && ids.length ? await user.profiles(ids) : {};
+    if (seq !== renderSeq) return;
+
+    const dayTotals = {};
+    exp.forEach((t) => { dayTotals[t.date] = (dayTotals[t.date] || 0) + t.amount; });
+    let html = '', last = null;
+    for (const t of list) {
+      if (t.date !== last) {
+        html += `<li class="day"><span>${esc(t.date)}</span><span>${dayTotals[t.date] ? '当天消费 ' + fmt(dayTotals[t.date]) : ''}</span></li>`;
+        last = t.date;
+      }
+      const who = t.by && ps[t.by] && ps[t.by].name;
+      html += `<li>
+        <div class="tx-main"><span class="tx-note">${esc(t.note || (t.type === 'deposit' ? '存入' : '消费'))}</span>
+          ${who ? `<span class="tx-by">${esc(who)} 记录</span>` : ''}</div>
+        <div class="tx-right"><span class="amt ${t.type === 'deposit' ? 'deposit' : 'expense'}">${t.type === 'deposit' ? '+' : '-'}${fmt(t.amount)}</span>
+          ${canWrite ? `<button class="del" data-id="${esc(t.id)}" aria-label="删除这条记录">删除</button>` : ''}</div>
+      </li>`;
+    }
+    $('txList').innerHTML = !loaded.t ? '<li class="empty">加载中……</li>' : html;
+    $('txEmpty').hidden = !loaded.t || list.length > 0;
+  }
+
+  $('txDate').value = today();
+  $('quickNotes').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-note]'); if (b) { $('txNote').value = b.dataset.note; $('txAmount').focus(); }
+  });
+
+  $('txForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const amount = toCents($('txAmount').value);
+    if (!Number.isFinite(amount) || amount <= 0) { toast('请输入大于 0 的金额'); return; }
+    if (amount > 10000000) { toast('金额太大了，检查一下'); return; }
+    const type = document.querySelector('input[name="txType"]:checked').value;
+    const doc = { type, amount, date: $('txDate').value || today(), note: $('txNote').value.trim().slice(0, 50), created: Date.now(), by: myId };
+    $('saveTx').disabled = true;
+    const ok = await write(() => db.collection('transactions').add(doc));
+    $('saveTx').disabled = !canWrite;
+    if (ok) {
+      $('txAmount').value = ''; $('txNote').value = '';
+      toast(`已记录：${type === 'deposit' ? '存入' : '消费'} ${fmt(amount)}`);
+    }
+  });
+
+  $('txList').addEventListener('click', (e) => {
+    const btn = e.target.closest('.del'); if (!btn) return;
+    armOrRun(btn, '确认删除', () => write(() => db.doc('transactions/' + btn.dataset.id).delete()));
+  });
+
+  // ---------- 备份 / 导入 ----------
+  $('copyBackup').addEventListener('click', () => {
+    const data = JSON.stringify({
+      restaurants: restaurants.map((r) => ({ name: r.name })),
+      transactions: txs.map(({ type, amount, date, note, created }) => ({ type, amount, date, note, created })),
+    }, null, 2);
+    const ta = $('backupText'); ta.value = data; ta.hidden = false;
+    const fallback = () => { ta.focus(); ta.select(); toast('已选中全部数据，按 Ctrl/⌘ + C 复制'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(data).then(() => toast('已复制到剪贴板，可粘贴保存为 .json 文件'), fallback);
+    } else fallback();
+  });
+
+  $('importInput').addEventListener('change', (e) => {
+    const file = e.target.files[0]; e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let data;
+      try { data = JSON.parse(reader.result); } catch (err) { toast('文件不是有效的 JSON'); return; }
+      if (!data || !Array.isArray(data.restaurants) || !Array.isArray(data.transactions)) { toast('文件格式不对，需要包含 restaurants 和 transactions'); return; }
+      const existing = new Set(restaurants.map((r) => r.name));
+      const rs = [...new Set(data.restaurants.map((r) => String(r && r.name || '').trim().slice(0, 30)).filter((n) => n && !existing.has(n)))];
+      const ts = data.transactions.filter((t) => t && (t.type === 'deposit' || t.type === 'expense') && Number.isInteger(t.amount) && t.amount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(t.date));
+      const box = $('importConfirm');
+      box.innerHTML = `<span>将追加 ${rs.length} 家饭店、${ts.length} 条流水到共享数据。</span>
+        <button type="button" class="btn" id="doImport">确认导入</button><button type="button" class="ghost" id="cancelImport">取消</button>`;
+      box.hidden = false;
+      $('cancelImport').onclick = () => { box.hidden = true; };
+      $('doImport').onclick = async () => {
+        box.innerHTML = '<span>导入中……</span>';
+        let done = 0;
+        for (const name of rs) { if (!(await write(() => db.collection('restaurants').add({ name, createdAt: Date.now(), by: myId })))) break; }
+        for (const t of ts) {
+          const ok = await write(() => db.collection('transactions').add({ type: t.type, amount: t.amount, date: t.date, note: String(t.note || '').slice(0, 50), created: Number(t.created) || Date.now(), by: myId }));
+          if (!ok) break; done++;
+        }
+        box.hidden = true;
+        toast(`导入完成：${rs.length} 家饭店，${done} 条流水`);
+      };
+    };
+    reader.readAsText(file);
+  });
+
+  // ---------- 连接共享数据 ----------
+  renderRestaurants(); renderLedger();
+
+  async function start() {
+    if (!window.claude || typeof window.claude.use !== 'function') {
+      setStatus('这个页面需要在 claude.ai 中打开才能读写共享数据。', true); setWritable(false); return;
+    }
+    const slow = setTimeout(() => setStatus('共享数据连接较慢，显示的内容可能还不是最新的……', true), 10000);
+    db = await window.claude.use('db');
+    if (!db) { clearTimeout(slow); setStatus('无法读取共享数据：请先登录 claude.ai，或请分享者给你访问权限。', true); setWritable(false); return; }
+    user = await window.claude.use('user');
+    if (user) {
+      myId = await user.id();
+      const w = await user.can('data.write');
+      if (w === false) { setWritable(false); setStatus('你现在只能查看。需要记账或改列表，请找分享者把你设为可编辑。'); }
+    }
+    let gotR = false, gotT = false;
+    const fresh = () => { if (gotR && gotT) { clearTimeout(slow); if (canWrite) setStatus(''); } };
+    const onErr = (e) => { clearTimeout(slow); if (e && e.code !== 'revoked') setStatus('共享数据连接断开了，刷新页面试试。', true); };
+
+    db.collection('restaurants').onSnapshot((s) => {
+      restaurants = s.docs.map((d) => Object.assign({ id: d.id }, d.data())).filter((r) => r.name)
+        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      loaded.r = true; renderRestaurants(); renderPick();
+      if (!s.metadata.fromCache) { gotR = true; fresh(); }
+    }, onErr);
+
+    db.collection('transactions').onSnapshot((s) => {
+      txs = s.docs.map((d) => Object.assign({ id: d.id }, d.data()))
+        .filter((t) => Number.isFinite(t.amount) && typeof t.date === 'string');
+      loaded.t = true; renderLedger();
+      if (!s.metadata.fromCache) { gotT = true; fresh(); }
+    }, onErr);
+
+    db.doc('picks/' + today()).onSnapshot((d) => { pick = d.exists ? d.data() : null; renderPick(); }, () => {});
+  }
+  start();
+
+  // 主题切换时重绘转盘空状态
+  if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawWheel);
+})();
+</script>
