@@ -47,6 +47,7 @@
 ├── shared/
 │   └── lunch.html      共享版源码，发布在 claude.ai，依赖 claude.ai 的共享数据库
 ├── .nojekyll           让 GitHub Pages 直接发布静态文件
+├── LICENSE             MIT 许可证
 └── README.md
 ```
 
@@ -66,7 +67,7 @@ python3 -m http.server 8000
 
 ## 部署
 
-- **单机版**：仓库 Settings → Pages，Source 选 *Deploy from a branch*，分支选 `claude/kind-ride-h1iu4i`（合并后可改为 `main`），目录 `/ (root)`。推送后自动更新。
+- **单机版**：仓库 Settings → Pages，Source 选 *Deploy from a branch*，分支选 `main`，目录 `/ (root)`。推送后自动更新。
 - **共享版**：修改 `shared/lunch.html` 后，需要在 Claude 里重新发布到同一个 artifact 链接，云端数据不会受影响。
 
 ## 数据格式
@@ -87,3 +88,7 @@ python3 -m http.server 8000
 - `amount`：金额，单位是**分**（`1850` = $18.50）
 - `date`：记账日期 `YYYY-MM-DD`
 - `created`：创建时间（毫秒时间戳），用来给同一天的记录排序
+
+## 许可证
+
+[MIT](LICENSE)
