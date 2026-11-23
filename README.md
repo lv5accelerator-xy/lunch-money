@@ -1,21 +1,15 @@
-# money-lunch 午饭小助手
+# 午饭小助手：抽饭店与饭钱记账
 
-同事们一起吃午饭用的小工具：
+同事们一起吃午饭用的小工具：转盘抽今天吃哪家，饭钱统一存在一位同事那里、每天按实际花费扣减。金额单位为加元（CAD）。纯 HTML / CSS / JavaScript，无依赖、无构建。
 
-1. **今天吃什么**：自己填饭店名字，转盘随机抽一家。
-2. **饭钱记账**：饭钱统一存在一位同事那里，每天吃了多少就从余额里扣，随时看还剩多少。
+**[▶ 多人共享版（推荐）](https://claude.ai/artifact/6weheAjdWcavcL1BmKXZ1e)** · [单机版](https://lv5accelerator-xy.github.io/lunch-money/)
 
-金额单位为 **加元（CAD）**。
+| 版本 | 数据存在哪 | 适合 |
+| --- | --- | --- |
+| 多人共享版 | 云端，所有人看到同一份，实时同步 | 大家一起管饭钱 |
+| 单机版 | 只在自己的浏览器里 | 一个人用，不用登录 |
 
-## 在线使用
-
-| 版本 | 链接 | 数据存在哪 | 适合 |
-|---|---|---|---|
-| **多人共享版**（推荐） | https://claude.ai/artifact/6weheAjdWcavcL1BmKXZ1e | 云端，所有人看到同一份，实时同步 | 大家一起管饭钱 |
-| 单机版 | https://lv5accelerator-xy.github.io/money-lunch/ | 只在自己的浏览器里 | 一个人用，不用登录 |
-
-> 共享版需要用 claude.ai 账号登录，并且要由页面所有者在右上角的 **Share** 菜单里分享给同事：
-> 设为 **Contributor（可编辑）** 的人可以加饭店、记账；设为 **Viewer（仅查看）** 的人只能看余额和流水。
+> 共享版需要用 claude.ai 账号登录，并由页面所有者在右上角 **Share** 菜单分享给同事：设为 **Contributor（可编辑）** 的人可以加饭店、记账；设为 **Viewer（仅查看）** 的人只能看余额和流水。
 
 ## 功能
 
@@ -37,38 +31,29 @@
 - 单机版：「导出备份」下载 JSON 文件，「导入备份」恢复（会覆盖当前数据）。
 - 共享版：「备份与导入」里可以复制全部数据，也可以导入单机版导出的 JSON（追加，不覆盖）。
 
-## 项目结构
-
-```
-.
-├── index.html          单机版页面（GitHub Pages 发布的就是它）
-├── style.css           单机版样式
-├── app.js              单机版逻辑，数据存在 localStorage
-├── shared/
-│   └── lunch.html      共享版源码，发布在 claude.ai，依赖 claude.ai 的共享数据库
-├── .nojekyll           让 GitHub Pages 直接发布静态文件
-├── LICENSE             MIT 许可证
-└── README.md
-```
-
-纯 HTML / CSS / JavaScript，没有依赖，不需要构建。
-
 ## 本地运行
 
-直接用浏览器打开 `index.html` 即可。或者起一个本地服务器：
+直接用浏览器打开 `index.html`，或起一个本地服务器后访问 <http://localhost:8000>：
 
 ```bash
 python3 -m http.server 8000
 ```
 
-然后访问 http://localhost:8000 。
-
 `shared/lunch.html` 只能在 claude.ai 里运行，直接打开会提示「需要在 claude.ai 中打开」。
 
-## 部署
+## 仓库结构
 
-- **单机版**：仓库 Settings → Pages，Source 选 *Deploy from a branch*，分支选 `main`，目录 `/ (root)`。推送后自动更新。
-- **共享版**：修改 `shared/lunch.html` 后，需要在 Claude 里重新发布到同一个 artifact 链接，云端数据不会受影响。
+| 路径 | 内容 |
+| --- | --- |
+| `index.html`、`style.css`、`app.js` | 单机版页面、样式与逻辑，数据存在 localStorage；GitHub Pages 发布的就是它 |
+| `shared/lunch.html` | 共享版源码，发布在 claude.ai，依赖 claude.ai 的共享数据库 |
+| `.nojekyll` | 让 GitHub Pages 直接发布静态文件 |
+| `LICENSE` | MIT 许可证 |
+
+## 发布
+
+- **单机版**：仓库 Settings → Pages，Source 选 *Deploy from a branch*，分支 `main`，目录 `/ (root)`；推送后自动更新。
+- **共享版**：修改 `shared/lunch.html` 后，在 Claude 里重新发布到同一个 artifact 链接，云端数据不受影响。
 
 ## 数据格式
 
@@ -89,6 +74,6 @@ python3 -m http.server 8000
 - `date`：记账日期 `YYYY-MM-DD`
 - `created`：创建时间（毫秒时间戳），用来给同一天的记录排序
 
-## 许可证
+## 授权
 
-[MIT](LICENSE)
+代码按 [MIT 许可证](LICENSE) 发布。
